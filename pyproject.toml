@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyan-eclipse-license-server"
+version = "0.1.0"
+description = "Cyan Eclipse License Server — licensing as MCP tools: signed .cetlic artefacts, a per-tenant hash-chained issuance journal, and (model B) online activation with real-time seat control. Provenance. Governance. Proof."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = ["cryptography>=41"]
+
+[project.scripts]
+cyan-eclipse-license-server = "license_server.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
