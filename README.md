@@ -15,9 +15,13 @@ activation token and artefact hash only (no usage telemetry), revocation
 takes effect at the next check-in, and a bounded 72-hour offline window
 separates a transient outage from suspension.
 
-Status: **In development · bench pending** — v1 core built 2026-11-12
-(Slate ETO-18). Nothing here is certified, deployed, or live. The HTTP
-face binds localhost in tests only; there is no production listener.
+Status: v1 core built 2026-11-12 and benched **PASS-WITH-FINDINGS at
+tenant-#1 fixture scope** (Verity bench, 2026-11-12) — that verdict
+covers the fixture scope; it is not a production certification. Cyan
+Eclipse runs this server for its own applications. This repository is
+the open MCP server for **self-hosting under MIT**. External hosted
+tenancy is v2 scope and is **not open today** — there is no public
+sign-up; hosted licensing is arranged by quote.
 
 ## Layout
 
@@ -39,6 +43,27 @@ PYTHONPATH=src python3 -m license_server --seed     # seed tenant #1 (Cyan Eclip
 PYTHONPATH=src python3 -m license_server            # MCP server on stdio
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
+
+Any MCP-capable host can drive it over stdio — point the host's MCP
+configuration at the server command:
+
+```json
+{
+  "mcpServers": {
+    "cyan-eclipse-license-server": {
+      "command": "python3",
+      "args": ["-m", "license_server"],
+      "env": { "PYTHONPATH": "src" }
+    }
+  }
+}
+```
+
+Caller context rides in the tool arguments (`_tenant_id` /
+`_principal_id`); authorisation — principal class, mandate scope,
+tier floors — is enforced inside the core, and every tool's contract
+is documented in its own description, input schema, and output
+schema on the `tools/list` surface.
 
 Runtime state (SQLite DB + signing keys) lives OUTSIDE the repo tree in
 `cyan-eclipse-license-server-runtime/` beside the build home: the signing
@@ -71,5 +96,5 @@ verify result, revocation list state. It is an MCP client of the core
 (T0 read tools over the stdio face) with no direct store access and no
 write path — v1 is read-only, firm-side only, bound to loopback
 (systemd unit `cyan-eclipse-license-admin.service`, 127.0.0.1:8798 on
-Shard E). Status: built 2026-11-12, bench-pending, tenant-#1 fixture
-scope.
+Shard E). Status: built 2026-11-12, benched **PASS** (2026-11-12),
+tenant-#1 fixture scope.

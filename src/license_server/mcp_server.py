@@ -6,8 +6,9 @@ mandate scope, tier floors, denylist -- is enforced inside the core.
 """
 import json, sys
 from .core import Core, Caller, ALL_TOOLS, TIER_FLOORS, DENYLIST
+from .tool_specs import TOOL_SPECS
 
-TOOL_DESCRIPTIONS = {n: f"{n} (tier T{TIER_FLOORS[n]}) -- Cyan Eclipse License Server" for n in ALL_TOOLS}
+TOOL_DESCRIPTIONS = {n: TOOL_SPECS[n]["description"] for n in ALL_TOOLS}
 
 def handle_request(core: Core, req: dict) -> dict:
     rid = req.get("id")
@@ -21,9 +22,14 @@ def handle_request(core: Core, req: dict) -> dict:
         return {"jsonrpc": "2.0", "id": rid, "result": {}}
     if method == "tools/list":
         params = req.get("params") or {}
-        tools = [{"name": t["name"], "description": TOOL_DESCRIPTIONS[t["name"]],
-                  "inputSchema": {"type": "object", "properties": {}}}
-                 for t in core.tools_list(is_admin=bool(params.get("is_admin")))]
+        tools = []
+        for t in core.tools_list(is_admin=bool(params.get("is_admin"))):
+            spec = TOOL_SPECS[t["name"]]
+            tools.append({"name": t["name"], "title": spec["title"],
+                          "description": spec["description"],
+                          "inputSchema": spec["inputSchema"],
+                          "outputSchema": spec["outputSchema"],
+                          "annotations": spec["annotations"]})
         return {"jsonrpc": "2.0", "id": rid, "result": {"tools": tools}}
     if method == "tools/call":
         params = req.get("params") or {}
