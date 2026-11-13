@@ -50,3 +50,24 @@ Dark surfaces only (P1). System font stack on web surfaces (P4).
   before it ships.
 - **Status label:** `In development · bench pending` (brand system §8 V1
   closed set). No seal is displayed: no bench card exists (S3).
+
+## Addendum — 2026-11-12 (web admin surface built)
+
+- **Web admin (SPEC S1.7 secondary surface): BUILT.** Server-rendered
+  admin at `admin/` in this repo, run as systemd unit
+  `cyan-eclipse-license-admin.service`, bound 127.0.0.1:8798 on Shard E
+  (loopback only, firm-side). It is an MCP client of the core (T0 read
+  tools only) — no direct store access, no write path; v1 is read-only.
+  Views: tenant overview · licence search + inspect · journal head +
+  chain verify · revocation list state. Brand application: wordmark
+  text treatment (CYAN ECLIPSE TECHNOLOGIES, ECLIPSE in --cyan),
+  product name in full composite form, tagline, canonical tokens,
+  status label "In development · bench pending". Fixture scope
+  (tenant #1) stated on the surface itself.
+- **Icon: still NONE** — the web admin uses the wordmark text
+  treatment only; no icon has been drawn or placeholdered, and the
+  Icongate rule is unchanged.
+- Surface proof: rendered captures of all five views against the
+  deployed fixture tenant, eyeballed 2026-11-12 —
+  ~/workspace/cyan-eclipse/license-server-20261112/admin-proof-20261112/.
+  Status remains bench-pending; Verity delta filed.

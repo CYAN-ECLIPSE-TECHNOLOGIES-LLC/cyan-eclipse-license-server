@@ -62,3 +62,14 @@ heartbeat 4 h · offline window 72 h · reclaim window 30 d · expiry grace 14 d
   activation path and no fallback. Owner ruling owed.
 
 A Cyan Eclipse Technologies product. The "Powered by Cyan Eclipse Technologies" attribution travels with it.
+
+## Web admin (SPEC S1.7)
+
+`admin/` in this repo is the minimal web admin the SPEC calls for:
+tenant overview, licence search + inspect, journal head + chain
+verify result, revocation list state. It is an MCP client of the core
+(T0 read tools over the stdio face) with no direct store access and no
+write path — v1 is read-only, firm-side only, bound to loopback
+(systemd unit `cyan-eclipse-license-admin.service`, 127.0.0.1:8798 on
+Shard E). Status: built 2026-11-12, bench-pending, tenant-#1 fixture
+scope.
