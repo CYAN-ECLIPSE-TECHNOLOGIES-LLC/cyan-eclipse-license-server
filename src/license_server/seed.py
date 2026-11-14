@@ -55,6 +55,6 @@ def seed(core, kid=DEFAULT_KID):
     res = core.dispatch(owner, "principal_manage",
                         {"action": "grant_mandate", "principal_id": ISSUER,
                          "products": ["parity", "loom", "plumb"],
-                         "op_classes": ["issue", "renew", "revoke", "supersede", "transfer", "deactivate", "reclaim"],
+                         "op_classes": ["issue", "renew", "revoke", "reinstate", "supersede", "transfer", "deactivate", "reclaim"],
                          "expires_at": "2027-11-12T00:00:00Z"})
     return {"tenant_id": TENANT_ID, "seeded": True, "kid": kid, "mandate": res}

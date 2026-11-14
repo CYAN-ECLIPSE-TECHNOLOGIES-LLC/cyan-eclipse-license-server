@@ -29,8 +29,10 @@ TIER_FLOORS = {
     "receipt_get": 0, "chain_verify": 0, "chain_verify_anchored": 0,
     "seat_usage": 0, "activation_list": 0, "activation_inspect": 0,
     "license_issue_propose": 1, "license_renew_propose": 1, "license_revoke_propose": 1,
+    "license_reinstate_propose": 1,
     "activation_deactivate_propose": 1,
-    "license_issue": 2, "license_renew": 2, "license_revoke": 2, "license_supersede": 2,
+    "license_issue": 2, "license_renew": 2, "license_revoke": 2, "license_reinstate": 2,
+    "license_supersede": 2,
     "product_register": 2, "tier_define": 2, "principal_manage": 2,
     "activation_deactivate": 2, "activation_reclaim_stale": 2}
 
@@ -42,8 +44,8 @@ READ_TOOLS = ["policy_show", "license_verify", "license_status", "license_list",
               "revocation_list_get", "journal_info", "journal_list", "receipt_get",
               "chain_verify", "chain_verify_anchored", "seat_usage", "activation_list", "activation_inspect"]
 PROPOSE_TOOLS = ["license_issue_propose", "license_renew_propose", "license_revoke_propose",
-                 "activation_deactivate_propose"]
-EXECUTE_TOOLS = ["license_issue", "license_renew", "license_revoke", "license_supersede",
+                 "license_reinstate_propose", "activation_deactivate_propose"]
+EXECUTE_TOOLS = ["license_issue", "license_renew", "license_revoke", "license_reinstate", "license_supersede",
                  "product_register", "tier_define", "principal_manage",
                  "activation_deactivate", "activation_reclaim_stale"]
 ALL_TOOLS = READ_TOOLS + PROPOSE_TOOLS + EXECUTE_TOOLS
@@ -456,6 +458,81 @@ class Core:
             self.store.rollback()
             raise
         return {"license_id": lic["license_id"], "state": "LICENSE_REVOKED", "receipt": receipt}
+
+    # ---------- reinstatement (Standard C, adopted 2026-11-14) ----------
+    # A licence revoked under the refund/chargeback standard whose payment
+    # is later reversed in the firm's favour is REINSTATED: the SAME licence
+    # returns to active service -- same license_id, same artefact, same
+    # seats, same install bindings (revocation never touched activations,
+    # so a live activation resumes at its next check-in). Reinstatement is
+    # NOT license_renew: renew mints a new licence and supersedes the old,
+    # which the standard expressly forbids for this leg.
+    def _latest_revocation(self, tenant_id, license_id):
+        r = self.store.q1("SELECT * FROM journal WHERE tenant_id=? AND license_id=? AND operation='revoke' ORDER BY sequence DESC LIMIT 1",
+                          (tenant_id, license_id))
+        return dict(r) if r else None
+
+    def _reinstate_blocker(self, lic):
+        """(message, state) if lic cannot be reinstated, else None. The
+        server's licence model records no revocation cause on the licence
+        row -- the cause lives in the revocation's journal entry (extra.
+        reason) -- so the only state distinctions available are revoked /
+        not-revoked / expired-beyond-grace, and those are what is enforced
+        here; cause review stays with the caller (the Standard C wiring
+        only calls this for its own revocations)."""
+        if lic["status"] != "revoked":
+            return (f"reinstate requires a revoked licence (state {self.license_state(lic)})",
+                    self.license_state(lic))
+        if not lic["perpetual"] and lic["expires_at"]:
+            exp = parse_iso(lic["expires_at"])
+            if utcnow() > exp + timedelta(days=self.policy["grace_days"]):
+                return ("licence expired beyond its grace window; reinstatement refused",
+                        "LICENSE_EXPIRED")
+        return None
+
+    def tool_license_reinstate_propose(self, caller, args):
+        self.require_principal(caller, ["tenant_owner", "issuer"])
+        lic = self.store.get_license(caller.tenant_id, args.get("license_id"))
+        if lic is None:
+            raise ToolError("unknown licence", state="LICENSE_UNKNOWN")
+        blocker = self._reinstate_blocker(lic)
+        if blocker:
+            raise ToolError(blocker[0], state=blocker[1])
+        rev = self._latest_revocation(caller.tenant_id, lic["license_id"])
+        if rev is None:
+            raise ToolError("licence is revoked but no revocation receipt exists in the journal; reinstatement refused")
+        payload = {"license_id": lic["license_id"], "product_id": lic["product_id"],
+                   "reason": args.get("reason", ""),
+                   "revocation_sequence": rev["sequence"],
+                   "revocation_receipt_hash": rev["receipt_hash"]}
+        return self._make_proposal(caller, "reinstate", payload)
+
+    def tool_license_reinstate(self, caller, args):
+        proposal = self._get_proposal(caller, "license_reinstate", args, "reinstate")
+        self._validate_token(caller, "license_reinstate", proposal, "reinstate", args)
+        payload = json.loads(proposal["payload"])
+        mandate = self.check_mandate(caller, "license_reinstate", payload["product_id"], "reinstate")
+        lic = self.store.get_license(caller.tenant_id, payload["license_id"])
+        blocker = self._reinstate_blocker(lic)
+        if blocker:
+            self.refuse(caller, "license_reinstate", blocker[0], proposal["proposal_hash"])
+        try:
+            receipt = self.journal.append(caller.tenant_id, "reinstate", actor=caller.principal_id,
+                                          license_id=lic["license_id"], mandate_ref=mandate["mandate_id"],
+                                          proposal_hash=proposal["proposal_hash"],
+                                          payload_hash=lic["artefact_hash"],
+                                          extra={"reason": payload.get("reason", ""),
+                                                 "revocation_sequence": payload.get("revocation_sequence"),
+                                                 "revocation_receipt_hash": payload.get("revocation_receipt_hash")})
+            self.store.x("UPDATE licenses SET status='active' WHERE tenant_id=? AND license_id=?",
+                         (caller.tenant_id, lic["license_id"]))
+            self.store.x("UPDATE proposals SET status='executed' WHERE proposal_id=?", (proposal["proposal_id"],))
+            self.store.commit()
+        except Exception:
+            self.store.rollback()
+            raise
+        return {"license_id": lic["license_id"], "state": "LICENSE_VALID", "receipt": receipt,
+                "revocation_sequence": payload.get("revocation_sequence")}
 
     # ---------- T2 admin: products / tiers / principals ----------
     def tool_product_register(self, caller, args):

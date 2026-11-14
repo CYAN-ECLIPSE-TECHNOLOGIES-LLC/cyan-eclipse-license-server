@@ -64,7 +64,7 @@ class TestFaces(unittest.TestCase):
     def test_mcp_tools_list_and_denylist(self):
         resp = handle_request(self.core, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         names = [t["name"] for t in resp["result"]["tools"]]
-        self.assertEqual(len(names), 27)
+        self.assertEqual(len(names), 29)
         for denied in ("license_delete", "journal_append", "key_export_private", "activation_delete", "mandate_self_grant"):
             self.assertNotIn(denied, names)
         for name in ("license_delete", "journal_append", "journal_rewrite", "key_export_private",

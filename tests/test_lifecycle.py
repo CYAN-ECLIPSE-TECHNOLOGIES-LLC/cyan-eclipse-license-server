@@ -15,7 +15,7 @@ class TestLifecycle(unittest.TestCase):
         self.assertEqual(p["policy"]["offline_window_hours"], 72)
         self.assertEqual(p["policy"]["reclaim_days"], 30)
         self.assertIn("cet-2026-01", p["kids_in_force"])
-        self.assertEqual(len(p["tools"]), 27)
+        self.assertEqual(len(p["tools"]), 29)
 
     def test_renew_creates_lineage_and_supersedes_old(self):
         m = issue(self.core, product="loom", tier="per-seat",

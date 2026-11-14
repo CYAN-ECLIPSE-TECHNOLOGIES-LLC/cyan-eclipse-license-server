@@ -9,7 +9,7 @@ from .util import canon, sha256_hex, now_iso
 import json
 
 GENESIS = "0" * 64
-OPERATIONS = ["issue", "renew", "revoke", "supersede", "transfer", "product_register", "tier_define",
+OPERATIONS = ["issue", "renew", "revoke", "reinstate", "supersede", "transfer", "product_register", "tier_define",
               "mandate_grant", "mandate_revoke", "key_rotate", "key_compromise", "activate", "deactivate", "seat_reclaim"]
 
 class Journal:

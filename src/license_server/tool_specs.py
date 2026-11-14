@@ -553,6 +553,49 @@ TOOL_SPECS = {
                               "confirm_token_shape": _S}),
         "annotations": _PROPOSE,
     },
+    "license_reinstate_propose": {
+        "title": "Propose reinstating a revoked licence",
+        "description": "Create a proposal to reinstate a revoked "
+                       "licence: return the SAME licence to active "
+                       "service with its original licence id, "
+                       "artefact, tier, seats and install bindings "
+                       "intact. This is the Standard C path -- a "
+                       "licence revoked under the refund/chargeback "
+                       "standard whose payment is later reversed in "
+                       "the firm's favour is reinstated, never "
+                       "re-issued; use license_renew (which mints a "
+                       "successor and supersedes the old licence) "
+                       "for term renewals instead. Validates that "
+                       "the licence exists (LICENSE_UNKNOWN), is "
+                       "currently revoked, and -- for term licences "
+                       "-- is not expired beyond its grace window. "
+                       "The proposal records the journal sequence "
+                       "and receipt hash of the revocation it "
+                       "reverses, and the executed reinstatement is "
+                       "journalled against that revocation. Caller "
+                       "must be tenant_owner or issuer. The "
+                       "proposal alone reinstates nothing: "
+                       "reinstatement happens only when "
+                       "license_reinstate executes it, and "
+                       "connected clients then see the licence "
+                       "valid at their next check-in. Each call "
+                       "creates a fresh proposal.",
+        "inputSchema": _schema({
+            "license_id": {"type": "string",
+                           "description": "Revoked licence to "
+                                          "reinstate (required)."},
+            "reason": {"type": "string",
+                       "description": "Reason recorded in the "
+                                      "journal at reinstatement "
+                                      "(for example the payment "
+                                      "reversal reference)."},
+            **_CTX_TP}, required=("license_id", "_tenant_id",
+                                   "_principal_id")),
+        "outputSchema": _out({"proposal_id": _S, "proposal_hash": _S,
+                              "kind": _S, "payload": _O,
+                              "confirm_token_shape": _S}),
+        "annotations": _PROPOSE,
+    },
     "activation_deactivate_propose": {
         "title": "Propose deactivating an activation",
         "description": "Create a proposal to deactivate one "
@@ -666,13 +709,18 @@ TOOL_SPECS = {
                        "proposal_id, the confirm token bound to "
                        "its hash (confirm-revoke-...), and a live "
                        "mandate covering the product and the "
-                       "revoke operation class. Revocation is "
-                       "final -- there is no un-revoke and licence "
-                       "deletion does not exist. Connected clients "
-                       "see LICENSE_REVOKED at their next check-in "
-                       "and the licence joins the signed revocation "
-                       "list. Returns the licence id, state "
-                       "LICENSE_REVOKED, and the journal receipt.",
+                       "revoke operation class. Revocation takes "
+                       "the licence out of service; a licence "
+                       "revoked under a payment that is later "
+                       "reversed in the firm's favour can be "
+                       "returned to service by license_reinstate "
+                       "(the same licence, never a re-issue), and "
+                       "licence deletion does not exist. Connected "
+                       "clients see LICENSE_REVOKED at their next "
+                       "check-in and the licence joins the signed "
+                       "revocation list. Returns the licence id, "
+                       "state LICENSE_REVOKED, and the journal "
+                       "receipt.",
         "inputSchema": _schema({
             "proposal_id": _PROPOSAL_ID,
             "confirm_token": _CONFIRM,
@@ -681,6 +729,38 @@ TOOL_SPECS = {
         "outputSchema": _out({"license_id": _S, "state": _S,
                               "receipt": _O}),
         "annotations": _EXEC_D,
+    },
+    "license_reinstate": {
+        "title": "Reinstate a revoked licence (execute proposal)",
+        "description": "Execute a reinstate proposal: journal the "
+                       "reinstatement -- linked to the revocation "
+                       "it reverses by journal sequence and receipt "
+                       "hash -- and mark the SAME licence active "
+                       "again. No new licence is minted and the "
+                       "original artefact, tier, seats and install "
+                       "bindings are unchanged, so connected "
+                       "clients see LICENSE_VALID at their next "
+                       "check-in on their existing activation. "
+                       "Requires the proposal_id, the confirm token "
+                       "bound to its hash (confirm-reinstate-...), "
+                       "and a live mandate covering the product and "
+                       "the reinstate operation class. Execution "
+                       "re-validates that the licence is still "
+                       "revoked and not expired beyond its grace "
+                       "window; anything else is refused and "
+                       "logged. Returns the licence id, state "
+                       "LICENSE_VALID, the journal receipt, and "
+                       "the revocation sequence reversed. A "
+                       "proposal executes exactly once.",
+        "inputSchema": _schema({
+            "proposal_id": _PROPOSAL_ID,
+            "confirm_token": _CONFIRM,
+            **_CTX_TP}, required=("proposal_id", "confirm_token",
+                                   "_tenant_id", "_principal_id")),
+        "outputSchema": _out({"license_id": _S, "state": _S,
+                              "receipt": _O,
+                              "revocation_sequence": _I}),
+        "annotations": _EXEC,
     },
     "product_register": {
         "title": "Register a product",
