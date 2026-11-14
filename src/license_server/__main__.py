@@ -6,16 +6,45 @@
   python -m license_server --http 8799     thin HTTP face on localhost ONLY
                                            (bench/tests; not a deployment)
 
-Runtime state defaults to the runtime dir OUTSIDE the repo tree:
-  /home/witness/app-family/cyan-eclipse-license-server-runtime/
-Override with CETLIC_RUNTIME_DIR / CETLIC_DB / CETLIC_KEY_DIR.
+Runtime state defaults to a runtime dir OUTSIDE the repo tree,
+resolved by default_runtime_dir() through proper mechanisms only:
+
+  1. CETLIC_RUNTIME_DIR env var — explicit deployment config (the
+     systemd unit and the Dockerfile both set it);
+  2. the per-user state root of the account running the server:
+       Windows  %LOCALAPPDATA%\CyanEclipseLicenseServer
+       macOS    ~/Library/Application Support/CyanEclipseLicenseServer
+       Linux    $XDG_STATE_HOME/cyan-eclipse-license-server
+                (fallback ~/.local/state/cyan-eclipse-license-server)
+
+No host-specific absolute path is ever a default (ETO-93).
+CETLIC_DB / CETLIC_KEY_DIR override the DB / key locations
+individually, wherever the runtime dir resolves.
 """
 import os, sys
 from .core import Core, Caller
 from .seed import seed, TENANT_ID, OWNER, DEFAULT_KID
 
-RUNTIME = os.environ.get("CETLIC_RUNTIME_DIR",
-                         "/home/witness/app-family/cyan-eclipse-license-server-runtime")
+def default_runtime_dir(environ=None, platform=None, home=None):
+    """Resolve the runtime state dir; see the module docstring."""
+    environ = os.environ if environ is None else environ
+    override = environ.get("CETLIC_RUNTIME_DIR")
+    if override:
+        return override
+    platform = sys.platform if platform is None else platform
+    home = os.path.expanduser("~") if home is None else home
+    if platform.startswith("win"):
+        base = environ.get("LOCALAPPDATA") or os.path.join(
+            home, "AppData", "Local")
+        return os.path.join(base, "CyanEclipseLicenseServer")
+    if platform == "darwin":
+        return os.path.join(home, "Library", "Application Support",
+                            "CyanEclipseLicenseServer")
+    base = environ.get("XDG_STATE_HOME") or os.path.join(
+        home, ".local", "state")
+    return os.path.join(base, "cyan-eclipse-license-server")
+
+RUNTIME = default_runtime_dir()
 
 def build_core():
     db = os.environ.get("CETLIC_DB", os.path.join(RUNTIME, "state.db"))
