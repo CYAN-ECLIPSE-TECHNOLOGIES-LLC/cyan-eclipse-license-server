@@ -13,7 +13,12 @@ owner-ruled activation model (B) — runs online activation with real-time
 seat control: a seat is a live activation slot, check-ins carry an
 activation token and artefact hash only (no usage telemetry), revocation
 takes effect at the next check-in, and a bounded 72-hour offline window
-separates a transient outage from suspension.
+separates a transient outage from suspension. A licence revoked under
+the firm's refund/chargeback standard (Standard C) can be reinstated —
+`license_reinstate_propose` → `license_reinstate`, propose →
+mandate-confirm — returning it to ACTIVE on the same licence id when
+the payment is reversed in the firm's favour, with the reinstatement
+journal-linked to the revocation it reverses.
 
 Status: v1 core built 2026-11-12 and benched **PASS-WITH-FINDINGS at
 tenant-#1 fixture scope** (Verity bench, 2026-11-12) — that verdict
