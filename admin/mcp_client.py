@@ -11,6 +11,12 @@ mandate scope, denylist — is enforced inside the core, not here).
 The client is read-only by construction in this package: the admin app
 only ever calls T0 tools, and this client refuses to dispatch any tool
 outside the T0 read set it is configured with.
+
+Runtime dir resolution (ETO-93 / WS-11b): CETLIC_RUNTIME_DIR env var
+first (explicit deployment config; both deployed units set it), else
+the SAME default_runtime_dir() mechanism the server itself uses in
+license_server.__main__ (per-user state root) — reused, never forked,
+and never a host-specific absolute path.
 """
 import json
 import os
@@ -27,6 +33,24 @@ READ_TOOLS = {
 }
 
 
+def _resolve_runtime_dir(server_src):
+    """Resolve the runtime dir through proper mechanisms only.
+
+    CETLIC_RUNTIME_DIR wins (checked here first so the deployed
+    admin, whose unit sets it explicitly, never needs to import
+    the server package); otherwise delegate to the server's own
+    default_runtime_dir() — the WS-11 mechanism, reused via the
+    server-src path this client already resolves, not re-implemented.
+    """
+    override = os.environ.get("CETLIC_RUNTIME_DIR")
+    if override:
+        return override
+    if server_src not in sys.path:
+        sys.path.insert(0, server_src)
+    from license_server.__main__ import default_runtime_dir
+    return default_runtime_dir()
+
+
 class McpError(Exception):
     """A tool call failed or the server returned an error result."""
 
@@ -37,9 +61,8 @@ class McpClient:
         repo = os.path.dirname(here)
         self.server_src = server_src or os.environ.get(
             "CETLIC_ADMIN_SERVER_SRC", os.path.join(repo, "src"))
-        self.runtime_dir = runtime_dir or os.environ.get(
-            "CETLIC_RUNTIME_DIR",
-            "/home/witness/app-family/cyan-eclipse-license-server-runtime")
+        self.runtime_dir = runtime_dir or _resolve_runtime_dir(
+            self.server_src)
         self.python = python or sys.executable
         self._proc = None
         self._seq = 0

@@ -11,6 +11,18 @@ Two legs:
     per-user state root), hermetically and in a fresh process,
     and that a seeded runtime lands under the override, never at
     a host-specific default.
+  * RepoTreeHostPathTest (WS-11b addendum, ETO-93 G-2) scans the
+    WHOLE repo tree — not just the shipped artefact — for the
+    same pattern class, so a non-shipped member (admin/, client/,
+    tests/) cannot carry the class silently. Exclusions, named:
+    .git/, __pycache__/, this test file itself (the fence), and
+    BENCH-REQUEST-*.md repo records, which quote the cured literal
+    as historical bench evidence (WS-11 G-3: naming the build home
+    is a record's function; records are not code defaults).
+  * AdminClientResolutionTest proves admin/mcp_client.py resolves
+    its runtime dir through the SAME default_runtime_dir()
+    mechanism (env override first, else the per-user state root),
+    closing the G-2 instance WS-11 enumerated but did not cure.
 
 The pattern literals below are the fence itself; this file is a
 test, not an artefact member.
@@ -23,6 +35,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(REPO, "src")
@@ -115,6 +128,63 @@ class RuntimeResolutionMechanismsTest(unittest.TestCase):
             self.assertNotIn("witness", got)
             self.assertFalse(got.startswith(REPO), got)
             self.assertTrue(got.startswith("/home/u"), got)
+
+
+# Repo records that quote the cured literal as bench evidence
+# (WS-11 G-3 class); they are records, not code defaults.
+REPO_TREE_EXCLUDED_BASENAMES = ("BENCH-REQUEST-",)
+
+
+class RepoTreeHostPathTest(unittest.TestCase):
+    def test_whole_repo_tree_carries_no_host_paths(self):
+        hits = []
+        for root, dirs, files in os.walk(REPO):
+            dirs[:] = [d for d in dirs
+                       if d not in (".git", "__pycache__")]
+            for name in files:
+                path = os.path.join(root, name)
+                if os.path.abspath(path) == os.path.abspath(__file__):
+                    continue  # this file is the fence itself
+                if name.startswith(REPO_TREE_EXCLUDED_BASENAMES):
+                    continue  # bench records quoting the literal
+                with open(path, "rb") as fh:
+                    data = fh.read()
+                for pat in HOST_PATTERNS:
+                    for m in re.finditer(pat, data):
+                        hits.append("%s: %r matched %s"
+                                    % (os.path.relpath(path, REPO),
+                                       pat, m.group()[:60]))
+        self.assertEqual([], hits)
+
+
+class AdminClientResolutionTest(unittest.TestCase):
+    """admin/mcp_client.py (ETO-93 G-2): reuse, not a fork."""
+
+    def _client(self):
+        if REPO not in sys.path:
+            sys.path.insert(0, REPO)
+        from admin.mcp_client import McpClient
+        return McpClient()
+
+    def test_admin_env_override_wins(self):
+        with mock.patch.dict(os.environ,
+                             {"CETLIC_RUNTIME_DIR": "/srv/cetlic-runtime"}):
+            self.assertEqual("/srv/cetlic-runtime",
+                             self._client().runtime_dir)
+
+    def test_admin_default_matches_server_mechanism(self):
+        if default_runtime_dir is None:
+            self.fail("default_runtime_dir is not defined")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"XDG_STATE_HOME": tmp, "HOME": tmp}
+            with mock.patch.dict(os.environ, env):
+                os.environ.pop("CETLIC_RUNTIME_DIR", None)
+                got = self._client().runtime_dir
+                self.assertEqual(default_runtime_dir(), got)
+                self.assertEqual(
+                    os.path.join(tmp, "cyan-eclipse-license-server")
+                    if sys.platform.startswith("linux") else got, got)
+                self.assertNotIn("witness", got)
 
 
 class FreshProcessResolutionTest(unittest.TestCase):
