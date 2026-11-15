@@ -9,7 +9,7 @@ description = "Cyan Eclipse License Server — licensing as MCP tools: signed .c
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-dependencies = ["cryptography>=41"]
+dependencies = ["cryptography>=48.0.1"]
 
 [project.scripts]
 cyan-eclipse-license-server = "license_server.__main__:main"
